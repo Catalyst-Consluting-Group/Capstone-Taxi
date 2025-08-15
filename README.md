@@ -41,7 +41,7 @@ Given various taxi data sources, we want to identify the best tendencies for dri
   <img src="images/LEGEND.png" style="zoom:100%;" />
 
 #### Star-Schema Diagram:
-<img src="images/Star-Schema.png" style="zoom:100%;" />
+<img src="images/star-schema.png" style="zoom:100%;" />
 
 
 
