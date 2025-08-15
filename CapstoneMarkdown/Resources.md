@@ -1,4 +1,4 @@
-## Data Sets on Amazon S
+## Data Sets on Amazon S3
 
 * All RAW datasets are located in `s3://capstone-techcatalyst-raw`
 
