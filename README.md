@@ -33,9 +33,12 @@ Given various taxi data sources, we want to identify the best tendencies for dri
 5. motor_vehicle_collisions___vehicles_20250809_csv: Details on vehicles involved in NYC collisions. 
 
 
-## Diagram:
+
+## Diagrams:
 #### Architecture Diagram
   <img src="images/diagram_capstone.png" style="zoom:100%;" />
+
+  <img src="images/LEGEND.png" style="zoom:100%;" />
 
 #### Star-Schema Diagram:
 <img src="images/Star-Schema.png" style="zoom:100%;" />
