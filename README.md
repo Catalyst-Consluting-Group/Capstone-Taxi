@@ -1,4 +1,4 @@
-# TechCatalyst Data Engineering Capstone Projec
+# TechCatalyst Data Engineering Capstone Project
 Using the NYC Taxi trip data (2024–2025), our goal is to build a complete data pipeline from ingestion to analysis to show insights about the data. 
 
 ## Statement of Purpose
