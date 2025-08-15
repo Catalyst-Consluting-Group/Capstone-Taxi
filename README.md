@@ -1,8 +1,11 @@
-# Statement of Purpose
+# TechCatalyst Data Engineering Capstone Project
+Using the NYC Taxi trip data (2024–2025), our goal is to build a complete data pipeline from ingestion to analysis to show insights about the data. 
+
+## Statement of Purpose
 
 Given various taxi data sources, we want to identify the best tendencies for drivers to have in order to maximize their profits drivings in New York.
 
-## Objectives:
+### Objectives:
 What boroughs generate the most profit for drivers? 
 
 What times lead to the most money for drivers? 
@@ -23,4 +26,10 @@ What boroughs have the most accidents?
 
 What are the most frequent trip times? 
 
-What ride services are preferred in each borough? 
+What ride services are preferred in each borough?
+
+
+## Diagram:
+  <img src="images/diagram_capstone.png" style="zoom:100%;" />
+
+
