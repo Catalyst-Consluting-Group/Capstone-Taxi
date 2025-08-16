@@ -3,8 +3,6 @@ import datetime
 import json
 import polars as pl
 import boto3
-from dotenv import load_dotenv
-load_dotenv()
 
 s3 = boto3.client('s3')
 
@@ -22,10 +20,14 @@ def handler(event, context):
     summary = (
         df.head(1000).select(df.columns).to_dicts()[:10]
     )
+    
+    print(summary)
+    print("SUCCESSFUL")
+
 
     def encode_datetime(obj):
         if isinstance(obj, datetime.datetime):
             return obj.isoformat()
         raise TypeError(f'Cannot serialize object of {type(obj)}')
 
-    return {"statusCode" : 400, "body" : json.dumps({"rows" : summary, "columns" : df.columns}, default=encode_datetime)}
+    return {"statusCode" : 200, "body" : json.dumps({"rows" : summary, "columns" : df.columns}, default=encode_datetime)}
