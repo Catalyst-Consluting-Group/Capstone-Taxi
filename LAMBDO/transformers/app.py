@@ -1,4 +1,5 @@
 import os
+import datetime
 import json
 import polars as pl
 import boto3
@@ -22,7 +23,9 @@ def handler(event, context):
         df.head(1000).select(df.columns).to_dicts()[:10]
     )
 
-    print(summary)
-    print(type(summary))
+    def encode_datetime(obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        raise TypeError(f'Cannot serialize object of {type(obj)}')
 
-    return {"statusCode" : 400, "body" : json.dumps({"rows" : summary, "columns" : df.columns})}
+    return {"statusCode" : 400, "body" : json.dumps({"rows" : summary, "columns" : df.columns}, default=encode_datetime)}

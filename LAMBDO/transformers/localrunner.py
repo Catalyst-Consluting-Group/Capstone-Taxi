@@ -1,5 +1,3 @@
-# Run your Lambda handler locally with a fake event
-
 from app import handler
 
 if __name__ == "__main__":
