@@ -1,0 +1,176 @@
+-- Service
+CREATE TABLE DimService (
+  ServiceKey INT IDENTITY PRIMARY KEY,
+  ServiceCode VARCHAR(10) UNIQUE,  -- 'YEL','GRN','HVF'
+  ServiceName VARCHAR(50)
+);
+
+-- Reconfirm DimZone (natural: locationid)
+CREATE TABLE DimZone (
+  ZoneKey        INT IDENTITY PRIMARY KEY,
+  LocationID     INT UNIQUE NOT NULL,
+  ZoneName       VARCHAR(100),
+  Borough        VARCHAR(60),
+  ShapeArea      DECIMAL(18,6) NULL,
+  ShapeLength    DECIMAL(18,6) NULL
+  -- Geometry column optional: GEOGRAPHY or VARBINARY depending on platform
+);
+
+-- Dates / Times
+CREATE TABLE DimDate (
+  DateKey INT PRIMARY KEY,         -- yyyymmdd
+  FullDate DATE NOT NULL,
+  Year INT, Quarter INT, Month INT, DayOfMonth INT, DayOfWeek INT, IsWeekend BIT
+);
+
+CREATE TABLE DimTime (
+  TimeKey INT PRIMARY KEY,         -- hhmmss
+  HHMMSS CHAR(6), Hour INT, Minute INT, Second INT, AMPM CHAR(2), FifteenMinBucket TINYINT
+);
+
+-- Provider
+CREATE TABLE DimProvider (
+  ProviderKey INT IDENTITY PRIMARY KEY,
+  Service VARCHAR(10),             -- 'Yellow','Green','HVFHS'
+  VendorID INT NULL,
+  HvfhsLicenseNum VARCHAR(20) NULL,
+  DispatchingBaseNum VARCHAR(20) NULL,
+  OriginatingBaseNum VARCHAR(20) NULL,
+  ProviderName VARCHAR(100) NULL
+);
+
+-- Reference/mini-dims
+CREATE TABLE DimRateCode (
+  RateCodeKey INT IDENTITY PRIMARY KEY,
+  RatecodeID INT UNIQUE,
+  Description VARCHAR(100)
+);
+
+CREATE TABLE DimPaymentType (
+  PaymentTypeKey INT IDENTITY PRIMARY KEY,
+  PaymentTypeCode INT UNIQUE,
+  Description VARCHAR(100)
+);
+
+CREATE TABLE DimTripType (
+  TripTypeKey INT IDENTITY PRIMARY KEY,
+  TripTypeCode INT UNIQUE,
+  Description VARCHAR(100)
+);
+
+-- Junk flags
+CREATE TABLE DimFlagsJunk (
+  FlagsJunkKey INT IDENTITY PRIMARY KEY,
+  StoreAndFwdFlag CHAR(1) NULL,         -- Y/G
+  SharedRequestFlag CHAR(1) NULL,       -- HVFHS
+  SharedMatchFlag CHAR(1) NULL,         -- HVFHS
+  AccessARideFlag CHAR(1) NULL,         -- HVFHS
+  WAVRequestFlag CHAR(1) NULL,          -- HVFHS
+  WAVMatchFlag CHAR(1) NULL             -- HVFHS
+);
+
+-- Fact
+CREATE TABLE FactTrip (
+  TripKey BIGINT IDENTITY PRIMARY KEY,
+
+  -- Date/Time
+  PickupDateKey INT NOT NULL FOREIGN KEY REFERENCES DimDate(DateKey),
+  DropoffDateKey INT NOT NULL FOREIGN KEY REFERENCES DimDate(DateKey),
+  PickupTimeKey INT NULL FOREIGN KEY REFERENCES DimTime(TimeKey),
+  DropoffTimeKey INT NULL FOREIGN KEY REFERENCES DimTime(TimeKey),
+
+  -- Location
+  PickupZoneKey INT NOT NULL FOREIGN KEY REFERENCES DimZone(ZoneKey),
+  DropoffZoneKey INT NOT NULL FOREIGN KEY REFERENCES DimZone(ZoneKey),
+
+  -- Providers & refs
+  ServiceKey INT NOT NULL FOREIGN KEY REFERENCES DimService(ServiceKey),
+  ProviderKey INT NOT NULL FOREIGN KEY REFERENCES DimProvider(ProviderKey),
+  RateCodeKey INT NULL FOREIGN KEY REFERENCES DimRateCode(RateCodeKey),
+  PaymentTypeKey INT NULL FOREIGN KEY REFERENCES DimPaymentType(PaymentTypeKey),
+  TripTypeKey INT NULL FOREIGN KEY REFERENCES DimTripType(TripTypeKey),
+  FlagsJunkKey INT NULL FOREIGN KEY REFERENCES DimFlagsJunk(FlagsJunkKey),
+
+  -- Descriptors
+  PassengerCount SMALLINT NULL,
+  TripMiles DECIMAL(9,3) NULL,          -- standardize here (Y/G: trip_distance; HVFHS: trip_miles)
+  TripTimeSeconds INT NULL,             -- HVFHS trip_time
+
+  -- Timestamps (optional raw)
+  PickupTimestamp DATETIME2 NULL,
+  DropoffTimestamp DATETIME2 NULL,
+  RequestTimestamp DATETIME2 NULL,      -- HVFHS
+  OnSceneTimestamp DATETIME2 NULL,      -- HVFHS Accessible only
+
+  -- Money
+  FareAmount DECIMAL(10,2) NULL,
+  Extra DECIMAL(10,2) NULL,
+  MtaTax DECIMAL(10,2) NULL,
+  TipAmount DECIMAL(10,2) NULL,         -- Y/G
+  Tips DECIMAL(10,2) NULL,              -- HVFHS
+  TollsAmount DECIMAL(10,2) NULL,
+  ImprovementSurcharge DECIMAL(10,2) NULL,
+  BCF DECIMAL(10,2) NULL,
+  SalesTax DECIMAL(10,2) NULL,
+  CongestionSurcharge DECIMAL(10,2) NULL,
+  AirportFee DECIMAL(10,2) NULL,
+  TotalAmount DECIMAL(10,2) NULL,
+  DriverPay DECIMAL(10,2) NULL
+);
+
+
+-- New FactCrash
+CREATE TABLE FactCrash (
+  CrashKey           BIGINT IDENTITY PRIMARY KEY,
+  CrashDateKey       INT NOT NULL REFERENCES DimDate(DateKey),
+  CrashTimeKey       INT NOT NULL REFERENCES DimTime(TimeKey),
+  CrashZoneKey       INT NULL REFERENCES DimZone(ZoneKey),
+
+  -- Degenerate natural key
+  CollisionID        BIGINT NOT NULL,      -- from COLLISION_ID
+
+  -- Lineage/degenerate attributes
+  BoroughText        VARCHAR(60) NULL,
+  ZipCode            VARCHAR(15) NULL,
+  OnStreetName       VARCHAR(200) NULL,
+  CrossStreetName    VARCHAR(200) NULL,
+  OffStreetName      VARCHAR(200) NULL,
+  Latitude           DECIMAL(9,6) NULL,
+  Longitude          DECIMAL(9,6) NULL,
+  CrashTimestamp     DATETIME2 NULL,
+
+  -- Measures
+  PersonsInjured         SMALLINT NULL,
+  PersonsKilled          SMALLINT NULL,
+  PedestriansInjured     SMALLINT NULL,
+  PedestriansKilled      SMALLINT NULL,
+  CyclistsInjured        SMALLINT NULL,
+  CyclistsKilled         SMALLINT NULL,
+  MotoristsInjured       SMALLINT NULL,
+  MotoristsKilled        SMALLINT NULL
+);
+
+-- Bridge + small dims
+CREATE TABLE DimVehicleType (
+  VehicleTypeKey INT IDENTITY PRIMARY KEY,
+  VehicleTypeName VARCHAR(60) UNIQUE
+);
+
+CREATE TABLE BridgeCrashVehicle (
+  CrashKey BIGINT NOT NULL REFERENCES FactCrash(CrashKey),
+  VehicleTypeKey INT NOT NULL REFERENCES DimVehicleType(VehicleTypeKey),
+  VehicleOrdinal TINYINT NOT NULL,       -- 1..5 as seen in source
+  PRIMARY KEY (CrashKey, VehicleTypeKey, VehicleOrdinal)
+);
+
+CREATE TABLE DimContributingFactor (
+  FactorKey INT IDENTITY PRIMARY KEY,
+  FactorName VARCHAR(120) UNIQUE
+);
+
+CREATE TABLE BridgeCrashFactor (
+  CrashKey BIGINT NOT NULL REFERENCES FactCrash(CrashKey),
+  FactorKey INT NOT NULL REFERENCES DimContributingFactor(FactorKey),
+  FactorOrdinal TINYINT NOT NULL,
+  PRIMARY KEY (CrashKey, FactorKey, FactorOrdinal)
+);
