@@ -1,0 +1,128 @@
+CREATE OR REPLACE TABLE FactTrip (
+    TripKey BIGINT AUTOINCREMENT PRIMARY KEY,
+
+    -- Dimension Keys
+    PickupDateKey INT REFERENCES DimDate(DateKey),
+    DropoffDateKey INT REFERENCES DimDate(DateKey),
+    PickupTimeKey INT REFERENCES DimTime(TimeKey),
+    DropoffTimeKey INT REFERENCES DimTime(TimeKey),
+    PickupZoneKey INT REFERENCES DimZone(ZoneKey),
+    DropoffZoneKey INT REFERENCES DimZone(ZoneKey),
+    ServiceKey INT REFERENCES DimService(ServiceKey),
+    ProviderKey INT REFERENCES DimProvider(ProviderKey),
+    RateCodeKey INT NULL REFERENCES DimRateCode(RateCodeKey),
+    PaymentTypeKey INT NULL REFERENCES DimPaymentType(PaymentTypeKey),
+    TripTypeKey INT NULL REFERENCES DimTripType(TripTypeKey),
+    FlagsJunkKey INT NULL REFERENCES DimFlagsJunk(FlagsJunkKey),
+
+    -- Degenerate keys
+    VendorTripID STRING NULL,
+    HVFHS_TripID STRING NULL,
+
+    -- Descriptive measures
+    PassengerCount INT NULL,
+    TripMiles DECIMAL(9,3) NULL,
+    TripTimeSeconds INT NULL,
+
+    -- Monetary values
+    FareAmount DECIMAL(10,2) NULL,
+    Extra DECIMAL(10,2) NULL,
+    MtaTax DECIMAL(10,2) NULL,
+    TipAmount DECIMAL(10,2) NULL,
+    TollsAmount DECIMAL(10,2) NULL,
+    ImprovementSurcharge DECIMAL(10,2) NULL,
+    BCF DECIMAL(10,2) NULL,
+    SalesTax DECIMAL(10,2) NULL,
+    CongestionSurcharge DECIMAL(10,2) NULL,
+    AirportFee DECIMAL(10,2) NULL,
+    TotalAmount DECIMAL(10,2) NULL,
+    DriverPay DECIMAL(10,2) NULL,
+
+    -- Timestamps (optional for lineage)
+    PickupTimestamp TIMESTAMP_NTZ,
+    DropoffTimestamp TIMESTAMP_NTZ,
+    RequestTimestamp TIMESTAMP_NTZ,
+    OnSceneTimestamp TIMESTAMP_NTZ
+);
+
+
+INSERT INTO FactTrip (
+    PickupDateKey, DropoffDateKey,
+    PickupTimeKey, DropoffTimeKey,
+    PickupZoneKey, DropoffZoneKey,
+    ServiceKey, ProviderKey,
+    RateCodeKey, PaymentTypeKey, TripTypeKey, FlagsJunkKey,
+    VendorTripID,
+    PassengerCount, TripMiles,
+    FareAmount, Extra, MtaTax, TipAmount, TollsAmount,
+    ImprovementSurcharge, CongestionSurcharge, AirportFee, TotalAmount,
+    PickupTimestamp, DropoffTimestamp
+)
+SELECT
+    TO_NUMBER(TO_CHAR(tpep_pickup_datetime,'YYYYMMDD')) AS PickupDateKey,
+    TO_NUMBER(TO_CHAR(tpep_dropoff_datetime,'YYYYMMDD')) AS DropoffDateKey,
+    TO_NUMBER(TO_CHAR(tpep_pickup_datetime,'HH24MI'))   AS PickupTimeKey,
+    TO_NUMBER(TO_CHAR(tpep_dropoff_datetime,'HH24MI'))  AS DropoffTimeKey,
+    zpu.ZoneKey, zdo.ZoneKey,
+    CASE WHEN tpep_pickup_datetime IS NOT NULL THEN 1 ELSE 2 END AS ServiceKey, -- 1=Yellow,2=Green
+    p.ProviderKey,
+    r.RateCodeKey,
+    pay.PaymentTypeKey,
+    tr.TripTypeKey,
+    f.FlagsJunkKey,
+    CONCAT(VendorID, '-', ROW_NUMBER() OVER (PARTITION BY VendorID ORDER BY tpep_pickup_datetime)) AS VendorTripID,
+    passenger_count,
+    trip_distance AS TripMiles,
+    fare_amount, extra, mta_tax, tip_amount, tolls_amount,
+    improvement_surcharge, congestion_surcharge, airport_fee, total_amount,
+    tpep_pickup_datetime, tpep_dropoff_datetime
+FROM all_taxi a
+LEFT JOIN DimZone zpu ON a.PULocationID = zpu.ZoneId
+LEFT JOIN DimZone zdo ON a.DOLocationID = zdo.ZoneId
+LEFT JOIN DimProvider p ON a.VendorID = p.VendorID
+LEFT JOIN DimRateCode r ON a.RatecodeID = r.RatecodeID
+LEFT JOIN DimPaymentType pay ON a.payment_type = pay.PaymentTypeCode
+LEFT JOIN DimTripType tr ON a.trip_type = tr.TripTypeCode
+LEFT JOIN DimFlagsJunk f ON a.store_and_fwd_flag = f.store_and_fwd_flag;
+
+
+
+INSERT INTO FactTrip (
+    PickupDateKey, DropoffDateKey,
+    PickupTimeKey, DropoffTimeKey,
+    PickupZoneKey, DropoffZoneKey,
+    ServiceKey, ProviderKey,
+    FlagsJunkKey,
+    HVFHS_TripID,
+    TripMiles, TripTimeSeconds,
+    BCF, SalesTax, CongestionSurcharge, AirportFee,
+    Tips, DriverPay,
+    PickupTimestamp, DropoffTimestamp, RequestTimestamp, OnSceneTimestamp
+)
+SELECT
+    TO_NUMBER(TO_CHAR(pickup_datetime,'YYYYMMDD')) AS PickupDateKey,
+    TO_NUMBER(TO_CHAR(dropoff_datetime,'YYYYMMDD')) AS DropoffDateKey,
+    TO_NUMBER(TO_CHAR(pickup_datetime,'HH24MI'))   AS PickupTimeKey,
+    TO_NUMBER(TO_CHAR(dropoff_datetime,'HH24MI'))  AS DropoffTimeKey,
+    zpu.ZoneKey, zdo.ZoneKey,
+    3 AS ServiceKey, -- HVFHS
+    p.ProviderKey,
+    f.FlagsJunkKey,
+    hvfhs_license_num || '-' || request_datetime AS HVFHS_TripID,
+    trip_miles, trip_time,
+    bcf, sales_tax, congestion_surcharge, airport_fee,
+    tips, driver_pay,
+    pickup_datetime, dropoff_datetime, request_datetime, on_scene_datetime
+FROM high_volume h
+LEFT JOIN DimZone zpu ON h.PULocationID = zpu.ZoneId
+LEFT JOIN DimZone zdo ON h.DOLocationID = zdo.ZoneId
+LEFT JOIN DimProvider p ON h.hvfhs_license_num = p.hvfhs_license_num
+    AND h.dispatching_base_num = p.dispatching_base_num
+LEFT JOIN DimFlagsJunk f 
+    ON h.shared_request_flag = f.shared_request_flag
+   AND h.shared_match_flag = f.shared_match_flag
+   AND h.access_a_ride_flag = f.access_a_ride_flag
+   AND h.wav_request_flag = f.wav_request_flag
+   AND h.wav_match_flag = f.wav_match_flag;
+
+
